@@ -154,7 +154,7 @@ export function setupGUI(parentContext) {
   //   2. Adjust joints, press K or "Save Keyframe" to capture each pose
   //   3. Press "■ Stop Recording" → session ends, keyframes are kept
   //   4. Press "▶ Playback" to preview the animation directly in the browser
-  //   5. Press "↓ Download Video" to render + export as .webm
+  //   5. Press "↓ Download Video" to render + export as .mp4 or .webm
 
   let savedKeyframes = [];
   let isRecSession = false;   // whether a recording session is active
@@ -348,8 +348,18 @@ export function setupGUI(parentContext) {
       // Start MediaRecorder BEFORE handing frames to the render loop
       const canvas = parentContext.renderer.domElement;
       const stream = canvas.captureStream(fps);
-      const options = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? { mimeType: 'video/webm;codecs=vp9' } : { mimeType: 'video/webm' };
+      let options;
+      let ext = 'webm';
+
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        options = { mimeType: 'video/mp4' };
+        ext = 'mp4';
+      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+        options = { mimeType: 'video/webm;codecs=vp9' };
+      } else {
+        options = { mimeType: 'video/webm' };
+      }
+
       const mr = new MediaRecorder(stream, options);
       const chunks = [];
       mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
@@ -366,12 +376,12 @@ export function setupGUI(parentContext) {
         mr.onstop = () => {
           removeHUD();
           parentContext._pbSliderSync = null;
-          const blob = new Blob(chunks, { type: 'video/webm' });
+          const blob = new Blob(chunks, { type: options.mimeType });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
           a.href = url;
-          a.download = `mujoco_keyframes_${ts}.webm`;
+          a.download = `mujoco_keyframes_${ts}.${ext}`;
           a.click();
           URL.revokeObjectURL(url);
           parentContext.params.paused = wasPaused;
@@ -528,7 +538,7 @@ export function setupGUI(parentContext) {
           <li>Save a <b>neutral standing pose</b> as keyframe 1 and a target pose as keyframe 2 for a clean stand&#8209;to&#8209;pose clip.</li>
           <li>Record 3+ keyframes: <em>stand → squat → stand</em> for a loopable animation.</li>
           <li>Use <b>Ctrl + A</b> to reset the camera to the front view before starting Playback for a nice angle.</li>
-          <li>The <code>.webm</code> file works in Chrome, Firefox, and most video editors (import as VP9).</li>
+          <li>The file exports as <code>.mp4</code> (if supported) or <code>.webm</code>.</li>
         </ul>
       </details>
 
@@ -540,7 +550,7 @@ export function setupGUI(parentContext) {
         4. Adjust sliders to a new pose &#8594; press <kbd>K</kbd> again. Repeat as needed.<br>
         5. Click <b>&#9632; Stop Recording</b> to end the session.<br>
         6a. <b>&#9654; Playback</b> &#8212; preview the animation in the browser.<br>
-        6b. <b>&#8595; Download Video</b> &#8212; exports as <code>.webm</code>.
+        6b. <b>&#8595; Download Video</b> &#8212; exports as <code>.mp4</code> or <code>.webm</code>.
       </p>
 
       <h3 style="color:#f0a050;margin:14px 0 6px;">&#128432;&#65039; Dragging Robot Bodies</h3>
@@ -1030,4 +1040,3 @@ export function standardNormal() {
   return Math.sqrt(-2.0 * Math.log(Math.random())) *
     Math.cos(2.0 * Math.PI * Math.random());
 }
-
